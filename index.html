@@ -187,36 +187,73 @@
             100% { transform: translateY(0px); }
         }
 
-        /* Voiceover Controls */
+        /* Voiceover Controls - Fixed to be non-intrusive */
         #voiceover-controls {
             position: fixed;
-            top: 20px;
-            right: 20px;
-            background: white;
+            bottom: 100px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             border-radius: var(--border-radius);
             box-shadow: var(--shadow);
-            padding: 15px;
-            z-index: 1001;
+            padding: 12px;
+            z-index: 999;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+            transition: var(--transition);
+            max-width: 300px;
+        }
+
+        #voiceover-controls.collapsed {
+            width: auto;
+            padding: 10px;
+        }
+
+        #voiceover-controls.collapsed #voiceover-indicator,
+        #voiceover-controls.collapsed #pause-btn {
+            display: none;
+        }
+
+        #voiceover-toggle {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        #voiceover-toggle:hover {
+            background: var(--primary-dark);
+            transform: scale(1.1);
         }
 
         #voiceover-indicator {
             background: var(--primary);
             color: white;
-            padding: 8px 15px;
+            padding: 6px 12px;
             border-radius: 20px;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             display: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
         }
 
         .voice-btn {
             background: var(--primary);
             color: white;
             border: none;
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -610,15 +647,36 @@
             }
 
             #voiceover-controls {
-                top: 10px;
-                right: 10px;
-                flex-direction: column;
+                bottom: 80px;
+                left: 10px;
+                max-width: 250px;
+            }
+
+            #voiceover-indicator {
+                max-width: 130px;
+                font-size: 0.75rem;
             }
 
             .guarantee-badges {
                 flex-direction: column;
                 align-items: center;
                 gap: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #voiceover-controls {
+                flex-direction: column;
+                gap: 5px;
+                max-width: 50px;
+            }
+            
+            #voiceover-controls:not(.collapsed) {
+                max-width: 150px;
+            }
+            
+            #voiceover-indicator {
+                max-width: 120px;
             }
         }
 
@@ -649,10 +707,13 @@
     </style>
 </head>
 <body>
-    <!-- Voiceover Controls -->
-    <div id="voiceover-controls">
+    <!-- Voiceover Controls - Non-intrusive bottom-left placement -->
+    <div id="voiceover-controls" class="collapsed">
+        <button id="voiceover-toggle" class="voice-btn">
+            <i class="fas fa-headphones"></i>
+        </button>
         <div id="voiceover-indicator">
-            <i class="fas fa-volume-up"></i> <span id="current-section">Audio Tour</span>
+            <span id="current-section">Audio Tour Ready</span>
         </div>
         <button id="play-btn" class="voice-btn">
             <i class="fas fa-play"></i>
@@ -1130,6 +1191,7 @@
                 this.currentAudio = null;
                 this.isMuted = false;
                 this.isPlaying = false;
+                this.isExpanded = false;
                 this.sections = {
                     'section-hero': {
                         audio: document.getElementById('audio-hero'),
@@ -1167,10 +1229,15 @@
             init() {
                 this.setupEventListeners();
                 this.setupIntersectionObserver();
-                this.showIndicator('Audio Tour Ready - Scroll to Begin', 3000);
+                this.showIndicator('Audio Tour Ready', 3000);
             }
 
             setupEventListeners() {
+                // Toggle button
+                document.getElementById('voiceover-toggle').addEventListener('click', () => {
+                    this.toggleExpanded();
+                });
+
                 // Play button
                 document.getElementById('play-btn').addEventListener('click', () => {
                     this.playCurrentSection();
@@ -1185,6 +1252,17 @@
                 document.getElementById('mute-btn').addEventListener('click', () => {
                     this.toggleMute();
                 });
+            }
+
+            toggleExpanded() {
+                this.isExpanded = !this.isExpanded;
+                const controls = document.getElementById('voiceover-controls');
+                
+                if (this.isExpanded) {
+                    controls.classList.remove('collapsed');
+                } else {
+                    controls.classList.add('collapsed');
+                }
             }
 
             setupIntersectionObserver() {
@@ -1230,7 +1308,7 @@
                 // When audio ends
                 this.currentAudio.onended = () => {
                     this.isPlaying = false;
-                    this.showIndicator('Scroll to continue tour', 2000);
+                    this.showIndicator('Scroll to continue', 2000);
                     this.updateButtonStates();
                 };
             }
@@ -1267,11 +1345,11 @@
                     this.stopAudio();
                     muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
                     muteBtn.classList.add('muted');
-                    this.showIndicator('Audio Tour Muted');
+                    this.showIndicator('Audio Muted');
                 } else {
                     muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
                     muteBtn.classList.remove('muted');
-                    this.showIndicator('Audio Tour Unmuted - Scroll to continue', 2000);
+                    this.showIndicator('Audio Unmuted', 2000);
                 }
 
                 this.updateButtonStates();
@@ -1300,7 +1378,7 @@
 
                 if (duration > 0) {
                     setTimeout(() => {
-                        if (indicator.style.display === 'flex') {
+                        if (indicator.style.display === 'flex' && !this.isPlaying) {
                             indicator.style.display = 'none';
                         }
                     }, duration);
@@ -1332,16 +1410,6 @@
         // Initialize the voiceover system when page loads
         document.addEventListener('DOMContentLoaded', () => {
             new VoiceoverSystem();
-        });
-
-        // Add scroll progress indicator
-        window.addEventListener('scroll', () => {
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-            const scrollProgress = (scrollTop / scrollHeight) * 100;
-            
-            // You could add a progress bar here if desired
-            // console.log(`Scroll progress: ${scrollProgress.toFixed(2)}%`);
         });
     </script>
 </body>
